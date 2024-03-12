@@ -8,7 +8,7 @@ docker run --rm --gpus=all \
 ```
 
 ```sh
-docker run --rm --gpus=all -p 8888:8888 tensorflow/tensorflow:latest-gpu-jupyter
+docker run --rm --gpus=all -it -p 8888:8888 tensorflow/tensorflow:latest-gpu-jupyter
 ```
 
 ```sh

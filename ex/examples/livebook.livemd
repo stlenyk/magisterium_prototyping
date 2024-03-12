@@ -24,18 +24,24 @@ When running, EXLA will look for available clients in this order: cuda, rocm, tp
 https://hexdocs.pm/exla/EXLA.html#module-configuration
 
 ```elixir
+Nx.global_default_backend({EXLA.Backend, client: :cuda})
+
 n = 1000
-iters = 10
+iters = 100
 shape = {n, n}
 key = Nx.Random.key(2137)
 {t1, key} = Nx.Random.uniform(key, shape: shape)
 {t2, _key} = Nx.Random.uniform(key, shape: shape)
 
 calculation = fn ->
-  Enum.map(0..iters, fn _ -> Nx.dot(t1, t2) |> Nx.sum(axes: [0, 1]) end)
+  0..(iters - 1)
+  |> Enum.map(fn _ ->
+    Nx.dot(t1, t2)
+    |> Nx.sum(axes: [0, 1])
+  end)
 end
 
 {time, res} = :timer.tc(calculation, [])
-IO.inspect(res)
+res |> Enum.at(iters - 1) |> IO.inspect()
 ~s/#{(time / 1000 / iters) |> Number.Delimit.number_to_delimited()} ms\/iter/ |> IO.puts()
 ```

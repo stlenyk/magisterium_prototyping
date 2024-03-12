@@ -1,0 +1,42 @@
+# Untitled notebook
+
+```elixir
+Mix.install(
+  [
+    {:nx, "~> 0.7.1"},
+    {:exla, "~> 0.7.1"}
+  ],
+  config: [
+    nx: [
+      default_backend: EXLA.Backend,
+      default_defn_options: [compiler: EXLA]
+    ],
+    exla: [
+      default_client: :cuda,
+      clients: [
+        host: [platform: :host],
+        cuda: [platform: :cuda]
+      ]
+    ]
+  ],
+  system_env: [
+    XLA_TARGET: "cuda120"
+  ]
+)
+```
+
+## Section
+
+```elixir
+n = 1000
+shape = {n, n}
+key = Nx.Random.key(2137)
+{t1, key} = Nx.Random.uniform(key, shape: shape)
+{t2, _key} = Nx.Random.uniform(key, shape: shape)
+
+for _ <- 0..100 do
+  t3 = Nx.multiply(t1, t2)
+end
+
+t3 |> Nx.sum() |> Nx.sum() |> IO.inspect()
+```

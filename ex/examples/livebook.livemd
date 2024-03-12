@@ -4,20 +4,11 @@
 Mix.install(
   [
     {:nx, "~> 0.7.1"},
-    {:exla, "~> 0.7.1"}
+    {:exla, "~> 0.7.1"},
+    {:number, "~> 1.0.4"}
   ],
   config: [
-    nx: [
-      default_backend: EXLA.Backend,
-      default_defn_options: [compiler: EXLA]
-    ],
-    exla: [
-      default_client: :cuda,
-      clients: [
-        host: [platform: :host],
-        cuda: [platform: :cuda]
-      ]
-    ]
+    nx: [default_backend: EXLA.Backend]
   ],
   system_env: [
     XLA_TARGET: "cuda120"
@@ -27,16 +18,24 @@ Mix.install(
 
 ## Section
 
+To compile EXLA for CUDA, set env var: **`XLA_TARGET="cuda120"`**, that's all.
+When running, EXLA will look for available clients in this order: cuda, rocm, tpu, host. So cuda will be prioritised, there's no need to set it as default.
+
+https://hexdocs.pm/exla/EXLA.html#module-configuration
+
 ```elixir
 n = 1000
+iters = 10
 shape = {n, n}
 key = Nx.Random.key(2137)
 {t1, key} = Nx.Random.uniform(key, shape: shape)
 {t2, _key} = Nx.Random.uniform(key, shape: shape)
 
-for _ <- 0..100 do
-  t3 = Nx.multiply(t1, t2)
+calculation = fn ->
+  Enum.map(0..iters, fn _ -> Nx.dot(t1, t2) |> Nx.sum(axes: [0, 1]) end)
 end
 
-t3 |> Nx.sum() |> Nx.sum() |> IO.inspect()
+{time, res} = :timer.tc(calculation, [])
+IO.inspect(res)
+~s/#{(time / 1000 / iters) |> Number.Delimit.number_to_delimited()} ms\/iter/ |> IO.puts()
 ```

@@ -24,7 +24,7 @@ When running, EXLA will look for available clients in this order: cuda, rocm, tp
 https://hexdocs.pm/exla/EXLA.html#module-configuration
 
 ```elixir
-Nx.global_default_backend({EXLA.Backend, client: :host})
+Nx.global_default_backend({EXLA.Backend, client: :cuda})
 
 n = 1000
 iters = 100
@@ -119,7 +119,7 @@ defmodule CoralReef do
   end
 
   defn crossover(key, t) do
-    n_crossover_points = t |> Nx.shape() |> elem(1) |> div(2)
+    n_crossover_points = t |> Nx.shape() |> elem(0) |> div(2)
     dim = Nx.shape(t) |> elem(1)
 
     {crossover_points, key} =
@@ -165,8 +165,28 @@ defmodule CoralReef do
   defn larvae_settling(key, grid_values, grid_alive, larvae, ops \\ []) do
     settling_trials = ops[:settling_trials]
     fitness_fn = ops[:fitness_fn]
-    shape = grid_values |> Nx.shape()
-    to_settle = 1 |> Nx.broadcast({elem(shape, 0)})
+
+    n_larvae = Nx.shape(larvae) |> elem(0)
+    n_corals = grid_values |> Nx.shape() |> elem(0)
+
+    {larvae, to_settle} =
+      if n_larvae < n_corals do
+        {
+          Nx.concatenate([
+            larvae,
+            0 |> Nx.broadcast({n_corals - n_larvae, larvae |> Nx.shape() |> elem(1)})
+          ]),
+          Nx.concatenate([
+            1 |> Nx.broadcast({n_larvae}),
+            0 |> Nx.broadcast({n_corals - n_larvae})
+          ])
+        }
+      else
+        {
+          larvae,
+          1 |> Nx.broadcast({n_corals})
+        }
+      end
 
     {key, grid_values, grid_alive, _larvae, _to_settle, _i} =
       while {key, grid_values, grid_alive, larvae, to_settle, i = 0},
@@ -175,18 +195,51 @@ defmodule CoralReef do
 
         {key, larvae, to_settle} = shuffle_together(key, larvae, to_settle)
 
-        fit_new = fitness_fn.(larvae |> Nx.vectorize(:rows))
-        fit_old = fitness_fn.(grid_values |> Nx.vectorize(:rows))
-        print_expr(larvae)
+        fit_new = fitness_fn.(larvae |> Nx.vectorize(:r)) |> Nx.devectorize()
+
+        fit_old =
+          fitness_fn.(grid_values |> Nx.vectorize(:r)) |> Nx.devectorize()
 
         settled = to_settle &&& (~~~grid_alive ||| fit_new > fit_old)
+        grid_alive = grid_alive ||| settled
 
+        settled_with_dim =
+          settled
+          |> Nx.reshape({:auto, 1})
+          |> Nx.broadcast(grid_values |> Nx.shape())
+
+        grid_values = Nx.select(settled_with_dim, larvae, grid_values)
         to_settle = Nx.bitwise_xor(to_settle, settled)
 
         {key, grid_values, grid_alive, larvae, to_settle, i}
       end
 
     {key, grid_values, grid_alive}
+  end
+
+  defn duplication(grid_values, opts \\ []) do
+    n = opts[:n]
+    fitness_fn = opts[:fitness_fn]
+    fit = fitness_fn.(grid_values |> Nx.vectorize(:r)) |> Nx.devectorize()
+    {_val, ind} = Nx.top_k(fit, k: n)
+    Nx.gather(grid_values, ind |> Nx.reshape({:auto, 1}))
+  end
+
+  # Note: doesn't respect the % chance of death. Always depredates.
+  defn depredation(grid_values, grid_alive, opts \\ []) do
+    n = opts[:n]
+    fitness_fn = opts[:fitness_fn]
+    fit = fitness_fn.(grid_values |> Nx.vectorize(:r)) |> Nx.devectorize()
+
+    {_val, ind} = Nx.top_k(-fit, k: n)
+    ind = ind |> Nx.reshape({:auto, 1})
+    updates = Nx.broadcast(0, ind |> Nx.flatten() |> Nx.shape())
+
+    Nx.indexed_put(
+      grid_alive,
+      ind,
+      updates
+    )
   end
 
   # idea: select alive ones and rest fill up with 0s (or maybe random vals in domain), and just don't care
@@ -199,74 +252,111 @@ defmodule CoralReef do
     {key, broadcasters} = crossover(key, broadcasters)
     {key, brooders} = bit_flip(key, brooders)
 
-    larvae_settling(
-      key,
-      grid_values,
-      grid_alive,
-      Nx.concatenate([broadcasters, brooders]),
-      fitness_fn: reef.fitness_fn,
-      settling_trials: reef.settling_trials
-    )
+    {key, grid_values, grid_alive} =
+      larvae_settling(
+        key,
+        grid_values,
+        grid_alive,
+        Nx.concatenate([broadcasters, brooders]),
+        fitness_fn: reef.fitness_fn,
+        settling_trials: reef.settling_trials
+      )
+
+    duplicates =
+      duplication(
+        grid_values,
+        n: reef.n_duplication,
+        fitness_fn: reef.fitness_fn
+      )
+
+    {key, grid_values, grid_alive} =
+      larvae_settling(
+        key,
+        grid_values,
+        grid_alive,
+        duplicates,
+        fitness_fn: reef.fitness_fn,
+        settling_trials: reef.settling_trials
+      )
+
+    grid_alive =
+      depredation(
+        grid_values,
+        grid_alive,
+        # Not a typo, it's the same number for simplicity
+        n: reef.n_duplication,
+        fitness_fn: reef.fitness_fn
+      )
+
+    {key, grid_values, grid_alive}
+  end
+
+  defn best(grid_values, opts \\ []) do
+    fitness_fn = opts[:fitness_fn]
+    idx = fitness_fn.(grid_values |> Nx.vectorize(:r)) |> Nx.devectorize() |> Nx.argmax()
+    grid_values[idx]
+  end
+
+  defn run(key, grid_values, grid_alive, opts \\ []) do
+    opts = keyword!(opts, [:reef])
+    reef = opts[:reef]
+
+    while {key, grid_values, grid_alive, i = 0}, i < reef.iters do
+      i = i + 1
+      {key, grid_values, grid_alive} = step(key, grid_values, grid_alive, reef: reef)
+      {key, grid_values, grid_alive, i}
+    end
   end
 end
 
 defmodule Fitness do
-  defn fit(x) do
+  defn one_max(x) do
     n = Nx.shape(x) |> elem(0)
     x |> Nx.sum() |> Nx.divide(n)
   end
 end
 
 {key, grid_values, grid_alive, reef} =
-  CoralReef.new(Enum.random(0..2137), &Fitness.fit(&1), 4, {0, 1}, {0, 1}, 10)
+  CoralReef.new(Enum.random(0..2137), &Fitness.one_max(&1), 500, {0, 1}, {0, 1}, 10_000)
 
-CoralReef.step(key, grid_values, grid_alive, reef: reef)
-```
-
-```elixir
-t = Nx.iota({6})
-t |> Nx.vectorize(:rows)
-t
-```
-
-```elixir
-import Nx.Defn
-
-defmodule Test1 do
-  defn my_defn(opts \\ []) do
-    opts = keyword!(opts, [:shape])
-    shape = opts[:shape]
-    Nx.iota(shape)
+Enum.reduce(
+  0..100,
+  {key, grid_values, grid_alive},
+  fn _, {key, grid_values, grid_alive} ->
+    CoralReef.step(key, grid_values, grid_alive, reef: reef)
   end
-end
+)
 
-# opts = [shape: {1, 2}]
-Test1.my_defn(shape: {1, 2})
+res = CoralReef.best(grid_values, fitness_fn: &Fitness.one_max(&1))
+Fitness.one_max(res)
 ```
 
 ```elixir
-defmodule Test do
-  defn calculate(opts \\ []) do
-    n = opts[:n]
-    shape = opts[:shape]
-    {t, key} = Nx.Random.uniform(Nx.Random.key(2137), shape: shape)
+t = Nx.iota({10, 6})
 
-    {t, _key, _i} =
-      while {t, key, i = 0}, i < n do
-        {r, key} = Nx.Random.uniform(key, shape: shape)
-        t = Nx.add(t, r)
-        i = i + 1
-        {t, key, i}
-      end
+n_crossover_points = t |> Nx.shape() |> elem(1) |> div(2)
+dim = Nx.shape(t) |> elem(1)
 
-    t
-  end
-end
+{crossover_points, key} =
+  Nx.Random.randint(key, 0, dim, shape: {n_crossover_points})
 
-{time, res} = :timer.tc(fn -> Test.calculate(n: 100, shape: {100_000}) end)
-time / 1000
-```
+# crossover_points =
+#   crossover_points
+#   |> Nx.reshape({:auto, 1})
+#   |> Nx.broadcast({n_crossover_points, 2})
+#   |> Nx.reshape({:auto, 1})
+#   |> Nx.broadcast(Nx.shape(t))
 
-```elixir
+# t_swap =
+#   t
+#   |> Nx.reshape({:auto, 2, dim})
+#   |> Nx.reverse(axes: [1])
+#   |> Nx.reshape({:auto, dim})
 
+# indexing = Nx.iota(t |> Nx.shape(), axis: 1)
+
+# {
+#   key,
+#   Nx.select(Nx.less(indexing, crossover_points), t, t_swap)
+# }
 ```

@@ -24,7 +24,7 @@ When running, EXLA will look for available clients in this order: cuda, rocm, tp
 https://hexdocs.pm/exla/EXLA.html#module-configuration
 
 ```elixir
-Nx.global_default_backend({EXLA.Backend, client: :cuda})
+Nx.global_default_backend({EXLA.Backend, client: :host})
 
 n = 1000
 iters = 100
@@ -44,4 +44,229 @@ end
 {time, res} = :timer.tc(calculation, [])
 res |> Enum.at(iters - 1) |> IO.inspect()
 ~s/#{(time / 1000 / iters) |> Number.Delimit.number_to_delimited()} ms\/iter/ |> IO.puts()
+```
+
+```elixir
+import Nx.Defn
+
+# Note: now works for ints only
+defmodule CoralReef do
+  defstruct fitness_fn: nil,
+            iters: nil,
+            dim: nil,
+            domain: nil,
+            mutation_range: nil,
+            settling_trials: nil,
+            n_broadcast: nil,
+            n_duplication: nil,
+            prob_die: nil
+
+  @type t :: %__MODULE__{
+          dim: integer,
+          domain: {number, number},
+          mutation_range: {number, number},
+          settling_trials: integer,
+          n_broadcast: float,
+          n_duplication: float,
+          prob_die: float
+        }
+
+  def new(
+        key,
+        fitness_fn,
+        dim,
+        domain,
+        mutation_range,
+        n_corals \\ 100,
+        settling_trials \\ 10,
+        frac_init_alive \\ 0.6,
+        frac_broadcast \\ 0.5,
+        frac_duplication \\ 0.1,
+        prob_die \\ 0.5
+      ) do
+    grid_values = Nx.broadcast(0, {n_corals, dim})
+    grid_alive = Nx.broadcast(0, {n_corals})
+
+    key = Nx.Random.key(key)
+    n_alive = trunc(frac_init_alive * n_corals)
+
+    {alive_ind, key} =
+      Nx.Random.choice(key, Nx.iota({n_corals}), replace: false, samples: n_alive)
+
+    alive_ind = Nx.reshape(alive_ind, {:auto, 1})
+
+    {values, key} =
+      Nx.Random.randint(key, elem(domain, 0), elem(domain, 1) + 1, shape: {n_alive, dim})
+
+    grid_values = Nx.indexed_put(grid_values, alive_ind, values)
+    grid_alive = Nx.indexed_put(grid_alive, alive_ind, Nx.broadcast(1, {n_alive}))
+
+    {
+      key,
+      grid_values,
+      grid_alive,
+      %CoralReef{
+        fitness_fn: fitness_fn,
+        dim: dim,
+        domain: domain,
+        mutation_range: mutation_range,
+        settling_trials: settling_trials,
+        n_broadcast: ((frac_broadcast * n_corals) |> trunc() |> div(2)) * 2,
+        n_duplication: trunc(frac_duplication * n_corals),
+        prob_die: prob_die
+      }
+    }
+  end
+
+  defn crossover(key, t) do
+    n_crossover_points = t |> Nx.shape() |> elem(1) |> div(2)
+    dim = Nx.shape(t) |> elem(1)
+
+    {crossover_points, key} =
+      Nx.Random.randint(key, 0, dim, shape: {n_crossover_points})
+
+    crossover_points =
+      crossover_points
+      |> Nx.reshape({:auto, 1})
+      |> Nx.broadcast({n_crossover_points, 2})
+      |> Nx.reshape({:auto, 1})
+      |> Nx.broadcast(Nx.shape(t))
+
+    t_swap =
+      t
+      |> Nx.reshape({:auto, 2, dim})
+      |> Nx.reverse(axes: [1])
+      |> Nx.reshape({:auto, dim})
+
+    indexing = Nx.iota(t |> Nx.shape(), axis: 1)
+
+    {
+      key,
+      Nx.select(Nx.less(indexing, crossover_points), t, t_swap)
+    }
+  end
+
+  defn bit_flip(key, t) do
+    {flip?, key} = Nx.Random.uniform(key, shape: Nx.shape(t))
+    {key, Nx.select(flip? < 0.5, t, 1 - t)}
+  end
+
+  # t: {n, dim}, mask: {n}
+  defn shuffle_together(key, t, mask) do
+    mask = Nx.reshape(mask, {:auto, 1}) |> Nx.broadcast(Nx.shape(t))
+    zipped = Nx.stack([t, mask])
+    {zipped, key} = Nx.Random.shuffle(key, zipped, axis: 1)
+    {t, mask} = zipped |> Nx.split(1, axis: 0)
+    t = t[0]
+    mask = mask[0] |> Nx.slice([0, 0], [elem(Nx.shape(mask), 1), 1]) |> Nx.flatten()
+    {key, t, mask}
+  end
+
+  defn larvae_settling(key, grid_values, grid_alive, larvae, ops \\ []) do
+    settling_trials = ops[:settling_trials]
+    fitness_fn = ops[:fitness_fn]
+    shape = grid_values |> Nx.shape()
+    to_settle = 1 |> Nx.broadcast({elem(shape, 0)})
+
+    {key, grid_values, grid_alive, _larvae, _to_settle, _i} =
+      while {key, grid_values, grid_alive, larvae, to_settle, i = 0},
+            i < settling_trials and to_settle |> Nx.sum() |> Nx.not_equal(0) do
+        i = i + 1
+
+        {key, larvae, to_settle} = shuffle_together(key, larvae, to_settle)
+
+        fit_new = fitness_fn.(larvae |> Nx.vectorize(:rows))
+        fit_old = fitness_fn.(grid_values |> Nx.vectorize(:rows))
+        print_expr(larvae)
+
+        settled = to_settle &&& (~~~grid_alive ||| fit_new > fit_old)
+
+        to_settle = Nx.bitwise_xor(to_settle, settled)
+
+        {key, grid_values, grid_alive, larvae, to_settle, i}
+      end
+
+    {key, grid_values, grid_alive}
+  end
+
+  # idea: select alive ones and rest fill up with 0s (or maybe random vals in domain), and just don't care
+  defn step(key, grid_values, grid_alive, opts \\ []) do
+    opts = keyword!(opts, [:reef])
+    reef = opts[:reef]
+    {shuffled, key} = Nx.Random.shuffle(key, grid_values)
+    {broadcasters, brooders} = shuffled |> Nx.split(reef.n_broadcast)
+
+    {key, broadcasters} = crossover(key, broadcasters)
+    {key, brooders} = bit_flip(key, brooders)
+
+    larvae_settling(
+      key,
+      grid_values,
+      grid_alive,
+      Nx.concatenate([broadcasters, brooders]),
+      fitness_fn: reef.fitness_fn,
+      settling_trials: reef.settling_trials
+    )
+  end
+end
+
+defmodule Fitness do
+  defn fit(x) do
+    n = Nx.shape(x) |> elem(0)
+    x |> Nx.sum() |> Nx.divide(n)
+  end
+end
+
+{key, grid_values, grid_alive, reef} =
+  CoralReef.new(Enum.random(0..2137), &Fitness.fit(&1), 4, {0, 1}, {0, 1}, 10)
+
+CoralReef.step(key, grid_values, grid_alive, reef: reef)
+```
+
+```elixir
+t = Nx.iota({6})
+t |> Nx.vectorize(:rows)
+t
+```
+
+```elixir
+import Nx.Defn
+
+defmodule Test1 do
+  defn my_defn(opts \\ []) do
+    opts = keyword!(opts, [:shape])
+    shape = opts[:shape]
+    Nx.iota(shape)
+  end
+end
+
+# opts = [shape: {1, 2}]
+Test1.my_defn(shape: {1, 2})
+```
+
+```elixir
+defmodule Test do
+  defn calculate(opts \\ []) do
+    n = opts[:n]
+    shape = opts[:shape]
+    {t, key} = Nx.Random.uniform(Nx.Random.key(2137), shape: shape)
+
+    {t, _key, _i} =
+      while {t, key, i = 0}, i < n do
+        {r, key} = Nx.Random.uniform(key, shape: shape)
+        t = Nx.add(t, r)
+        i = i + 1
+        {t, key, i}
+      end
+
+    t
+  end
+end
+
+{time, res} = :timer.tc(fn -> Test.calculate(n: 100, shape: {100_000}) end)
+time / 1000
+```
+
+```elixir
+
 ```

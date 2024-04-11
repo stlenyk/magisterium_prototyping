@@ -120,14 +120,16 @@ class CoralReef:
             new_corals = new_corals[~settled_mask]
 
     def _asexual_reproduction(self):
-        n_duplication = int(self.fract_duplication * len(torch.where(self.grid_alive)))
+        n_duplication = int(self.fract_duplication * torch.where(self.grid_alive)[0].shape[0])
         best_corals = self.grid_values[
             torch.topk(self.grid_fitness, n_duplication).indices
         ]
         self._larvae_settling(best_corals)
 
     def _depredation(self):
-        n_depradation = int(self.frac_duplication * len(torch.where(self.grid_alive)))
+        n_depradation = int(
+            self.frac_duplication * torch.where(self.grid_alive)[0].shape[0]
+        )
         coral_indices = torch.topk(-self.grid_fitness, n_depradation).indices
         coral_indices = coral_indices[
             torch.rand(coral_indices.shape[0], device=self.device) < self.prob_die
@@ -138,7 +140,7 @@ class CoralReef:
         alive = torch.where(self.grid_alive)[0]
         alive = alive[torch.randperm(alive.shape[0], device=self.device)]
 
-        n_broadcasters = int(self.fract_broadcast * len(alive)) // 2 * 2
+        n_broadcasters = int(self.fract_broadcast * alive.shape[0]) // 2 * 2
         broadcasted = self._broadcast_spawning(alive, n_broadcasters)
         brooded = self._brooding(alive, n_broadcasters)
 
@@ -164,9 +166,9 @@ def one_max(x):
 
 
 reef = CoralReef(
-    device=torch.device("cpu"),
+    device=torch.device("cuda"),
     fitness_fn=one_max,
-    n_corals=10_000,
+    n_corals=100_000,
     domain=(0, 1),
     mutation_range=1,
     dim=500,
@@ -180,4 +182,3 @@ for _ in range(100):
     reef.step()
     alive = torch.where(reef.grid_alive)[0].shape[0]
     print(f"{reef.best()[1].cpu().numpy():.2f}", alive)
-

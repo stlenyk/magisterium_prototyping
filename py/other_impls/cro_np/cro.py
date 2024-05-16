@@ -4,7 +4,7 @@
 from __future__ import division, print_function
 import sys
 import logging
-from multiprocess import Pool, cpu_count
+from multiprocessing import Pool, cpu_count
 
 import numpy as np
 
@@ -368,7 +368,7 @@ class CRO(object):
 
             if n!=Ngen:
                 (REEF, REEFpob, REEFfitness) = self.depredation(REEF, REEFpob, REEFfitness)    
-                (REEF, REEFpob, REEFfitness) = self.extremedepredation(REEF, REEFpob, REEFfitness, int(np.round(self.ke*N*M)))
+                # (REEF, REEFpob, REEFfitness) = self.extremedepredation(REEF, REEFpob, REEFfitness, int(np.round(self.ke*N*M)))
 
             Fitness[:, n] = self.opt_multiplier*REEFfitness
 

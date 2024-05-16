@@ -1,25 +1,31 @@
 import torch
 
 
-class OptimizationAlgorithm:
-    def __init__(self, fitness_fn, dim, domain, device):
-        self.fitness_fn = fitness_fn
-        self.dim = dim
-        self.domain = domain
-        self.device = device
+def bit_flip_chance(chance=0.1):
+    def wrapper(x):
+        return torch.where(torch.rand(x.shape, device=x.device) < chance, 1 - x, x)
+
+    return wrapper
 
 
-def bit_flip_chance(x, device, chance=0.1):
-    return torch.where(torch.rand(x.shape, device=device) < chance, 1 - x, x)
-
-
-def bit_flip_n(device, n=1):
-    def wrapped(x):
-        indices = torch.randint(0, x.shape[0], (n,), device=device)
+def bit_flip_n(n=1):
+    def wrapper(x):
+        indices = torch.randint(0, x.shape[0], (n,), device=x.device)
         x[indices] = 1 - x[indices]
         return x
 
-    return wrapped
+    return wrapper
+
+
+def uniform_crossover(x, y):
+    mask = torch.rand(x.shape, device=x.device) < 0.5
+    return torch.where(mask, x, y)
+
+
+def single_point_crossover(x, y):
+    crossover_point = torch.randint(0, x.shape[-1], [1], device=x.device)
+    mask = torch.arange(x.shape[-1], device=x.device) < crossover_point
+    return torch.where(mask, x, y)
 
 
 def one_max(x):

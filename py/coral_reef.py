@@ -1,7 +1,7 @@
 from typing import Callable
 import torch
 
-from common import one_max
+from common import one_max, bit_flip_chance, uniform_crossover
 
 
 class CoralReef:
@@ -60,38 +60,11 @@ class CoralReef:
             torch.zeros(n_corals, dtype=torch.float32, device=self.device),
         )
 
-    def _uniform_crossover(self, x, y):
-        mask = torch.rand(x.shape, device=self.device) < 0.5
-        return torch.where(mask, x, y)
-
-    def _single_point_crossover(self, x, y):
-        crossover_point = torch.randint(0, x.shape[-1], [1], device=self.device)
-        mask = torch.arange(x.shape[-1], device=self.device) < crossover_point
-        return torch.where(mask, x, y)
-
     def _broadcast_spawning(
         self, alive: torch.Tensor, n_broadcasters: int
     ) -> torch.Tensor:
         broadcasters = self.grid_values[alive[:n_broadcasters]]
-
-        # crossover_points = torch.randint(
-        #     0, broadcasters.shape[-1], [n_broadcasters // 2], device=self.device
-        # )
-        # crossover_points = crossover_points.repeat(2)
-        # crossover_points = crossover_points.reshape(-1, 1)
-        # crossover_points = crossover_points.repeat(1, broadcasters.shape[1])
-        # broadcasters_swap = broadcasters.reshape(-1, 2, broadcasters.shape[-1])
-        # broadcasters_swap = torch.flip(broadcasters_swap, [1])
-        # broadcasters_swap = broadcasters_swap.reshape(-1, broadcasters.shape[-1])
-
-        # indexing = torch.arange(broadcasters.shape[1], device=self.device)
-        # indexing = indexing.reshape(1, -1)
-        # indexing = indexing.repeat(broadcasters.shape[0], 1)
-
-        # mask = indexing <= crossover_points
-
-        # new_corals = torch.where(mask, broadcasters, broadcasters_swap)
-        new_corals = torch.vmap(self._uniform_crossover, randomness="different")(
+        new_corals = torch.vmap(uniform_crossover, randomness="different")(
             broadcasters[::2], broadcasters[1::2]
         )
 
@@ -101,7 +74,7 @@ class CoralReef:
         brooders = self.grid_values[alive[n_broadcasters:]]
 
         if self.mutation_fn is not None:
-            return self.mutation_fn(brooders, device=self.device)
+            return torch.vmap(self.mutation_fn, randomness="different")(brooders)
 
         mutation = torch.randint(
             -self.mutation_range,
@@ -173,10 +146,6 @@ class CoralReef:
         return best_coral, self.fitness_fn(best_coral)
 
 
-def bit_flip(x, device, chance=0.1):
-    return torch.where(torch.rand(x.shape, device=device) < chance, 1 - x, x)
-
-
 reef = CoralReef(
     device="cuda",
     fitness_fn=one_max,
@@ -186,7 +155,7 @@ reef = CoralReef(
     dim=500,
     dtype=torch.int32,
     settling_trials=3,
-    mutation_fn=bit_flip,
+    mutation_fn=bit_flip_chance(),
     fract_broadcast=0.7,
     fract_duplication=0.1,
     prob_die=0.1,

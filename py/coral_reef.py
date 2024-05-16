@@ -1,6 +1,8 @@
 from typing import Callable
 import torch
 
+from common import one_max
+
 
 class CoralReef:
     def __init__(
@@ -61,12 +63,12 @@ class CoralReef:
     def _uniform_crossover(self, x, y):
         mask = torch.rand(x.shape, device=self.device) < 0.5
         return torch.where(mask, x, y)
-    
+
     def _single_point_crossover(self, x, y):
         crossover_point = torch.randint(0, x.shape[-1], [1], device=self.device)
         mask = torch.arange(x.shape[-1], device=self.device) < crossover_point
         return torch.where(mask, x, y)
-    
+
     def _broadcast_spawning(
         self, alive: torch.Tensor, n_broadcasters: int
     ) -> torch.Tensor:
@@ -123,7 +125,7 @@ class CoralReef:
             alive = self.grid_alive[indices]
             old_fitness = self.grid_fitness[indices]
             new_fitness = torch.func.vmap(self.fitness_fn)(new_corals)
-            settled_mask = ~alive | (new_fitness > old_fitness)
+            settled_mask = ~alive | (new_fitness < old_fitness)
             settled_indices = indices[settled_mask]
 
             self.grid_values[settled_indices] = new_corals[settled_mask]
@@ -167,7 +169,7 @@ class CoralReef:
         self._depredation()
 
     def best(self):
-        best_coral = self.grid_values[torch.argmax(self.grid_fitness)]
+        best_coral = self.grid_values[torch.argmin(self.grid_fitness)]
         return best_coral, self.fitness_fn(best_coral)
 
 
@@ -175,18 +177,10 @@ def bit_flip(x, device, chance=0.1):
     return torch.where(torch.rand(x.shape, device=device) < chance, 1 - x, x)
 
 
-def one_max(x):
-    n = x.shape[0]
-    return torch.sum(x) / n * 100
-
-
-torch.set_num_threads(1)
-
-
 reef = CoralReef(
-    device=torch.device("cpu"),
+    device="cuda",
     fitness_fn=one_max,
-    n_corals=1_000,
+    n_corals=100_000,
     domain=(0, 1),
     mutation_range=1,
     dim=500,
@@ -202,4 +196,4 @@ reef = CoralReef(
 for _ in range(100):
     reef.step()
     alive = torch.where(reef.grid_alive)[0].shape[0]
-    print(f"{reef.best()[1].cpu().numpy():.2f}", alive)
+    print(f"{-reef.best()[1].cpu().numpy():.2f}", alive)

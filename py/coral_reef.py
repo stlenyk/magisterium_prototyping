@@ -1,7 +1,7 @@
 from typing import Callable
 import torch
 
-from common import one_max, bit_flip_chance, uniform_crossover
+from common import one_max, bit_flip_prob, uniform_crossover
 
 
 class CoralReef:
@@ -155,7 +155,7 @@ reef = CoralReef(
     dim=500,
     dtype=torch.int32,
     settling_trials=3,
-    mutation_fn=bit_flip_chance(),
+    mutation_fn=bit_flip_prob(),
     fract_broadcast=0.7,
     fract_duplication=0.1,
     prob_die=0.1,

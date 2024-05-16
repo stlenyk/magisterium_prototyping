@@ -1,9 +1,30 @@
 import torch
 
 
-def bit_flip_chance(chance=0.1):
+def mutation_n(domain_clip, draw_range, n=1):
     def wrapper(x):
-        return torch.where(torch.rand(x.shape, device=x.device) < chance, 1 - x, x)
+        indices = torch.randint(0, x.shape[0], (n,), device=x.device)
+        values = torch.randint(draw_range[0], draw_range[1] + 1, (n,), device=x.device, dtype=x.dtype)
+        valeus = torch.clip(values, domain_clip[0], domain_clip[1])
+        x[indices] += values
+        return x
+
+    return wrapper
+
+
+def mutation_prob(domain_clip, draw_range, probability=0.1):
+    def wrapper(x):
+        mask = torch.rand(x.shape, device=x.device) < probability
+        values = torch.randint(draw_range[0], draw_range[1] + 1, x.shape, device=x.device, dtype=x.dtype)
+        values = torch.clip(values, domain_clip[0], domain_clip[1])
+        return torch.where(mask, x + values, x)
+
+    return wrapper
+
+
+def bit_flip_prob(p=0.1):
+    def wrapper(x):
+        return torch.where(torch.rand(x.shape, device=x.device) < p, 1 - x, x)
 
     return wrapper
 

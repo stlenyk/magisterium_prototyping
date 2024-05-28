@@ -31,14 +31,21 @@ class SimulatedAnnealing:
         )
         fit = self.fitnes_fn(s)
         self.best = s
+        self.best_fit = fit
 
         for k in range(self.steps):
+            # log every 1% of the steps
+            if k % (self.steps // 100) == 0:
+                print(f"{k / self.steps * 100:.0f}%", -self.fitnes_fn(self.best))
             new_s = self.mutation_fn(s)
             new_fit = self.fitnes_fn(new_s)
             t = 1 - k / self.steps
-            if self._acceptance_prob(fit, new_fit, t) > torch.rand(1, device=self.device):
-                if new_fit < fit:
+            if self._acceptance_prob(fit, new_fit, t) > torch.rand(
+                1, device=self.device
+            ):
+                if new_fit < self.best_fit:
                     self.best = new_s
+                    self.best_fit = new_fit
                 s = new_s
                 fit = new_fit
 
@@ -57,12 +64,12 @@ algorithm = SimulatedAnnealing(
     fitness_fn=one_max,
     dim=500,
     domain=(0, 1),
-    steps=100_000,
+    steps=10_000,
     mutation_fn=bit_flip_prob(p=0.5),
     device="cuda",
 )
 
 algorithm.run()
-print(-one_max(algorithm.best))
+print(-algorithm.best_fit)
 elapsed_time = timer() - t0
 print(f"Elapsed time: {elapsed_time:.2f}s")

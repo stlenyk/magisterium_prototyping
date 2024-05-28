@@ -44,7 +44,6 @@ class AritficialBeeColony:
         self.population = torch.where(
             selected.reshape(-1, 1), new_population, self.population
         )
-        self._update_best(new_fitness)
 
     def _update_best(self, new_fitness):
         best_candidate = torch.argmin(new_fitness)

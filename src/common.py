@@ -3,7 +3,7 @@ import torch
 
 def mutation_n(domain_clip, draw_range, n=1):
     def wrapper(x):
-        indices = torch.randint(0, x.shape[0], (n,), device=x.device)
+        indices = torch.randint(x.shape[0] + 1, (n,), device=x.device)
         values = torch.randint(
             draw_range[0], draw_range[1] + 1, (n,), device=x.device, dtype=x.dtype
         )
@@ -28,7 +28,7 @@ def mutation_prob(domain_clip, draw_range, probability=0.1):
 
 def bit_flip_n(n=1):
     def wrapper(x: torch.Tensor):
-        indices = torch.randint(0, x.shape[0], (n,), device=x.device)
+        indices = torch.randint(x.shape[0] + 1, (n,), device=x.device)
         x[indices] = 1 - x[indices]
         return x
 

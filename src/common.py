@@ -24,8 +24,8 @@ def mutation_n(domain_clip: Domain, draw_range: Domain, n: int = 1) -> TensorFn:
         values = torch.randint(
             draw_range[0], draw_range[1] + 1, (n,), device=x.device, dtype=x.dtype
         )
-        values = torch.clip(values, domain_clip[0], domain_clip[1])
-        x[indices] += values
+        values = torch.where(torch.rand(n, device=x.device) < 0.5, values, -values)
+        x[indices] = torch.clip(x[indices] + values, domain_clip[0], domain_clip[1])
         return x
 
     return wrapper
@@ -48,8 +48,11 @@ def mutation_prob(
         values = torch.randint(
             draw_range[0], draw_range[1] + 1, x.shape, device=x.device, dtype=x.dtype
         )
-        values = torch.clip(values, domain_clip[0], domain_clip[1])
-        return torch.where(mask, x + values, x)
+        values = torch.where(
+            torch.rand(x.shape, device=x.device) < probability, values, -values
+        )
+        mutated = torch.clip(x + values, domain_clip[0], domain_clip[1])
+        return torch.where(mask, mutated, x)
 
     return wrapper
 

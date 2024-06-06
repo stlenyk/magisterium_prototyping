@@ -13,13 +13,14 @@ class SimulatedAnnealing:
         mutation_fn: Callable[[torch.Tensor], torch.Tensor] = bit_flip_prob(p=0.5),
         device: torch.device = "cpu",
     ) -> None:
-        self.fitnes_fn = fitness_fn
+        self.fitness_fn = fitness_fn
         self.dim = dim
         self.domain = domain
         self.mutation_fn = mutation_fn
         self.device = device
         self.steps = steps
         self.best = None
+        self.best_fit = None
 
     def run(self):
         s = torch.randint(
@@ -29,16 +30,16 @@ class SimulatedAnnealing:
             device=self.device,
             dtype=torch.int32,
         )
-        fit = self.fitnes_fn(s)
+        fit = self.fitness_fn(s)
         self.best = s
         self.best_fit = fit
 
         for k in range(self.steps):
             # log every 1% of the steps
             if k % (self.steps // 100) == 0:
-                print(f"{k / self.steps * 100:.0f}%", -self.fitnes_fn(self.best))
+                print(f"{k / self.steps * 100:.0f}%", -self.fitness_fn(self.best))
             new_s = self.mutation_fn(s)
-            new_fit = self.fitnes_fn(new_s)
+            new_fit = self.fitness_fn(new_s)
             t = 1.0 - (k / self.steps)
             if self._acceptance_prob(fit, new_fit, t) > torch.rand(
                 1, device=self.device
@@ -49,27 +50,29 @@ class SimulatedAnnealing:
                 s = new_s
                 fit = new_fit
 
-    def _acceptance_prob(self, e, new_e, t):
+    @staticmethod
+    def _acceptance_prob(e, new_e, t):
         if new_e < e:
             return 1.0
         else:
             return torch.exp((e - new_e) / t)
 
 
-from timeit import default_timer as timer
+if __name__ == "__main__":
+    from timeit import default_timer as timer
 
-t0 = timer()
+    t0 = timer()
 
-algorithm = SimulatedAnnealing(
-    fitness_fn=one_max,
-    dim=50_000_000,
-    domain=(0, 1),
-    steps=1_000,
-    mutation_fn=bit_flip_prob(p=0.5),
-    device="cuda",
-)
+    algorithm = SimulatedAnnealing(
+        fitness_fn=one_max,
+        dim=50_000_000,
+        domain=(0, 1),
+        steps=1_000,
+        mutation_fn=bit_flip_prob(p=0.5),
+        device="cuda",
+    )
 
-algorithm.run()
-print(-algorithm.best_fit)
-elapsed_time = timer() - t0
-print(f"Elapsed time: {elapsed_time:.2f}s")
+    algorithm.run()
+    print(-algorithm.best_fit)
+    elapsed_time = timer() - t0
+    print(f"Elapsed time: {elapsed_time:.2f}s")

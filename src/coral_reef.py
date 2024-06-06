@@ -11,8 +11,8 @@ class CoralReef:
         fitness_fn: Callable,
         dtype: torch.dtype,
         dim: int,
-        domain: tuple[torch.dtype, torch.dtype],
-        mutation_range: torch.dtype,
+        domain: tuple[int, int],
+        mutation_range: int,
         settling_trials: int = 10,
         frac_init_alive: float = 0.2,
         n_corals: int = 100,
@@ -117,10 +117,10 @@ class CoralReef:
         self._larvae_settling(best_corals)
 
     def _depredation(self):
-        n_depradation = int(
+        n_depredation = int(
             self.frac_duplication * torch.where(self.grid_alive)[0].shape[0]
         )
-        coral_indices = torch.topk(-self.grid_fitness, n_depradation).indices
+        coral_indices = torch.topk(-self.grid_fitness, n_depredation).indices
         coral_indices = coral_indices[
             torch.rand(coral_indices.shape[0], device=self.device) < self.prob_die
         ]
@@ -134,7 +134,7 @@ class CoralReef:
         broadcasted = self._broadcast_spawning(alive, n_broadcasters)
         brooded = self._brooding(alive, n_broadcasters)
 
-        settling_candidates = torch.cat([broadcasted, brooded], axis=0)
+        settling_candidates = torch.cat([broadcasted, brooded], dim=0)
         self._larvae_settling(settling_candidates)
 
         self._asexual_reproduction()
@@ -146,23 +146,24 @@ class CoralReef:
         return best_coral, self.fitness_fn(best_coral)
 
 
-reef = CoralReef(
-    device="cuda",
-    fitness_fn=one_max,
-    n_corals=100_000,
-    domain=(0, 1),
-    mutation_range=1,
-    dim=500,
-    dtype=torch.int32,
-    settling_trials=3,
-    mutation_fn=bit_flip_prob(),
-    fract_broadcast=0.7,
-    fract_duplication=0.1,
-    prob_die=0.1,
-)
+if __name__ == "__main__":
 
+    reef = CoralReef(
+        device="cuda",
+        fitness_fn=one_max,
+        n_corals=100_000,
+        domain=(0, 1),
+        mutation_range=1,
+        dim=500,
+        dtype=torch.int32,
+        settling_trials=3,
+        mutation_fn=bit_flip_prob(),
+        fract_broadcast=0.7,
+        fract_duplication=0.1,
+        prob_die=0.1,
+    )
 
-for _ in range(100):
-    reef.step()
-    alive = torch.where(reef.grid_alive)[0].shape[0]
-    print(f"{-reef.best()[1].cpu().numpy():.2f}", alive)
+    for _ in range(100):
+        reef.step()
+        alive = torch.where(reef.grid_alive)[0].shape[0]
+        print(f"{-reef.best()[1].cpu().numpy():.2f}", alive)

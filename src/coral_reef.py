@@ -1,70 +1,73 @@
-from typing import Callable
-import torch
+import common
 
-from common import one_max, bit_flip_prob, uniform_crossover
+import torch
 
 
 class CoralReef:
     def __init__(
         self,
-        device: torch.device,
-        fitness_fn: Callable,
-        dtype: torch.dtype,
+        fitness_fn: common.TensorFn,
         dim: int,
-        domain: tuple[int, int],
-        mutation_range: int,
+        domain: common.Domain,
+        dtype: torch.dtype = None,
+        n_population: int = 100,
         settling_trials: int = 10,
         frac_init_alive: float = 0.2,
-        n_corals: int = 100,
-        fract_broadcast: float = 0.5,
-        fract_duplication: float = 0.1,
+        frac_broadcast: float = 0.5,
+        frac_duplication: float = 0.1,
         prob_die: float = 0.5,
-        mutation_fn: Callable = None,
+        mutation_fn: common.TensorFn = None,
+        device: torch.device = "cpu",
     ):
         self.device = device
         self.fitness_fn = fitness_fn
         self.dtype = dtype
         self.domain = domain
-        self.mutation_range = mutation_range
         self.settling_trials = settling_trials
-        self.frac_duplication = fract_duplication
+        self.frac_duplication = frac_duplication
         self.prob_die = prob_die
+        if mutation_fn is None:
+            mutation_fn = common.mutation_prob(
+                domain_clip=domain, draw_range=domain, probability=0.1
+            )
         self.mutation_fn = mutation_fn
-        self.fract_broadcast = fract_broadcast
-        self.fract_duplication = fract_duplication
+        self.fract_broadcast = frac_broadcast
+        self.fract_duplication = frac_duplication
         self.prob_die = prob_die
 
-        n_alive = int(frac_init_alive * n_corals)
+        n_alive = int(frac_init_alive * n_population)
         self.grid_alive = torch.cat(
             (
                 torch.ones(n_alive, dtype=torch.bool, device=self.device),
-                torch.zeros(n_corals - n_alive, dtype=torch.bool, device=self.device),
+                torch.zeros(
+                    n_population - n_alive, dtype=torch.bool, device=self.device
+                ),
             )
         )
-        self.grid_alive = self.grid_alive[torch.randperm(n_corals)]
+        self.grid_alive = self.grid_alive[torch.randperm(n_population)]
         self.grid_values = torch.where(
             self.grid_alive.reshape(-1, 1),
             torch.randint(
                 domain[0],
                 domain[1] + 1,
-                [n_corals, dim],
+                [n_population, dim],
                 dtype=self.dtype,
                 device=self.device,
             ),
-            torch.zeros([n_corals, dim], dtype=self.dtype, device=self.device),
+            torch.zeros([n_population, dim], dtype=self.dtype, device=self.device),
         )
 
         self.grid_fitness = torch.where(
             self.grid_alive,
             torch.func.vmap(fitness_fn)(self.grid_values),
-            torch.zeros(n_corals, dtype=torch.float32, device=self.device),
+            torch.zeros(n_population, dtype=torch.float32, device=self.device),
         )
 
     def _broadcast_spawning(
         self, alive: torch.Tensor, n_broadcasters: int
     ) -> torch.Tensor:
         broadcasters = self.grid_values[alive[:n_broadcasters]]
-        new_corals = torch.vmap(uniform_crossover, randomness="different")(
+        new_corals = torch.vmap(common.uniform_crossover, randomness="different")(
             broadcasters[::2], broadcasters[1::2]
         )
 
@@ -72,19 +75,7 @@ class CoralReef:
 
     def _brooding(self, alive: torch.Tensor, n_broadcasters: int) -> torch.Tensor:
         brooders = self.grid_values[alive[n_broadcasters:]]
-
-        if self.mutation_fn is not None:
-            return torch.vmap(self.mutation_fn, randomness="different")(brooders)
-
-        mutation = torch.randint(
-            -self.mutation_range,
-            self.mutation_range,
-            brooders.shape,
-            device=self.device,
-        )
-        new_corals = brooders + mutation
-        new_corals = torch.clip(new_corals, self.domain[0], self.domain[1])
-        return new_corals
+        return torch.vmap(self.mutation_fn, randomness="different")(brooders)
 
     def _larvae_settling(self, new_corals: torch.Tensor):
         for _ in range(self.settling_trials):
@@ -127,6 +118,7 @@ class CoralReef:
         self.grid_alive[coral_indices] = False
 
     def step(self):
+        """Perform a single step of the CRO algorithm."""
         alive = torch.where(self.grid_alive)[0]
         alive = alive[torch.randperm(alive.shape[0], device=self.device)]
 
@@ -150,16 +142,14 @@ if __name__ == "__main__":
 
     reef = CoralReef(
         device="cuda",
-        fitness_fn=one_max,
-        n_corals=100_000,
+        fitness_fn=common.one_max,
+        n_population=100_000,
         domain=(0, 1),
-        mutation_range=1,
         dim=500,
-        dtype=torch.int32,
         settling_trials=3,
-        mutation_fn=bit_flip_prob(),
-        fract_broadcast=0.7,
-        fract_duplication=0.1,
+        mutation_fn=common.bit_flip_prob(),
+        frac_broadcast=0.7,
+        frac_duplication=0.1,
         prob_die=0.1,
     )
 

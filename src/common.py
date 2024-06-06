@@ -1,7 +1,26 @@
+import functools
+from typing import TypeAlias, Callable
+
 import torch
 
 
-def mutation_n(domain_clip, draw_range, n=1):
+DType: TypeAlias = int | float | bool
+Domain: TypeAlias = tuple[int, int] | tuple[float, float] | tuple[bool, bool]
+TensorFn: TypeAlias = Callable[[torch.Tensor], torch.Tensor]
+
+
+def mutation_n(
+    domain_clip: Domain, draw_range: Domain, n: int = 1
+) -> Callable[[torch.Tensor], torch.Tensor]:
+    """Creates a mutation function that adds n random values to n random indices of a tensor.
+
+    Args:
+        domain_clip: The domain to clip the random values to.
+        draw_range: The range to draw the random values from.
+        n: The number of random values to add.
+    """
+
+    @functools.wraps(mutation_n)
     def wrapper(x: torch.Tensor) -> torch.Tensor:
         indices = torch.randint(x.shape[0] + 1, (n,), device=x.device)
         values = torch.randint(
@@ -14,7 +33,18 @@ def mutation_n(domain_clip, draw_range, n=1):
     return wrapper
 
 
-def mutation_prob(domain_clip, draw_range, probability=0.1):
+def mutation_prob(
+    domain_clip: Domain, draw_range: Domain, probability: float = 0.1
+) -> Callable[[torch.Tensor], torch.Tensor]:
+    """Creates a mutation function that adds random values to random indices of a tensor with a given probability.
+
+    Args:
+        domain_clip: The domain to clip the random values to.
+        draw_range: The range to draw the random values from.
+        probability: The probability [0.0, 1.0] of adding a random value to an index.
+    """
+
+    @functools.wraps(mutation_prob)
     def wrapper(x: torch.Tensor) -> torch.Tensor:
         mask = torch.rand(x.shape, device=x.device) < probability
         values = torch.randint(
@@ -26,7 +56,14 @@ def mutation_prob(domain_clip, draw_range, probability=0.1):
     return wrapper
 
 
-def bit_flip_n(n=1):
+def bit_flip_n(n: int = 1) -> Callable[[torch.Tensor], torch.Tensor]:
+    """Creates a mutation function that flips n random bits of a tensor.
+
+    Args:
+        n: The number of bits to flip.
+    """
+
+    @functools.wraps(bit_flip_n)
     def wrapper(x: torch.Tensor) -> torch.Tensor:
         indices = torch.randint(x.shape[0], (n,), device=x.device)
         x[indices] = 1 - x[indices]
@@ -35,7 +72,13 @@ def bit_flip_n(n=1):
     return wrapper
 
 
-def bit_flip_prob(p=0.1):
+def bit_flip_prob(p: float = 0.1) -> Callable[[torch.Tensor], torch.Tensor]:
+    """Creates a mutation function that flips bits of a tensor with a given probability.
+    Args:
+        p: The probability [0.0, 1.0] of flipping a bit.
+    """
+
+    @functools.wraps(bit_flip_prob)
     def wrapper(x: torch.Tensor) -> torch.Tensor:
         return torch.where(torch.rand(x.shape, device=x.device) < p, 1 - x, x)
 
@@ -43,17 +86,19 @@ def bit_flip_prob(p=0.1):
 
 
 def uniform_crossover(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    """Performs uniform crossover between two tensors. Returns a single offspring tensor."""
     mask = torch.rand(x.shape, device=x.device) < 0.5
     return torch.where(mask, x, y)
 
 
 def single_point_crossover(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    """Performs single-point crossover between two tensors. Returns a single offspring tensor."""
     crossover_point = torch.randint(0, x.shape[-1], [1], device=x.device)
     mask = torch.arange(x.shape[-1], device=x.device) < crossover_point
-    # return torch.where(mask, x, y)
-    # return two offspring
-    return x * mask + y * ~mask, y * mask + x * ~mask
+    return torch.where(mask, x, y)
+
 
 def one_max(x: torch.Tensor) -> torch.Tensor:
+    """Fitness function. Returns the percentage of ones in a tensor."""
     n = x.shape[0]
     return -torch.sum(x) / n * 100

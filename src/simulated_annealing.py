@@ -1,24 +1,26 @@
+import common
+
 import torch
-from typing import Callable
-from common import bit_flip_prob, one_max
 
 
 class SimulatedAnnealing:
     def __init__(
         self,
-        fitness_fn: Callable[[torch.Tensor], torch.Tensor],
+        fitness_fn: common.TensorFn,
         dim: int,
-        domain: tuple[int, int],
+        domain: common.Domain,
+        dtype: torch.dtype = None,
         steps: int = 1000,
-        mutation_fn: Callable[[torch.Tensor], torch.Tensor] = bit_flip_prob(p=0.5),
+        mutation_fn: common.TensorFn = None,
         device: torch.device = "cpu",
     ) -> None:
         self.fitness_fn = fitness_fn
         self.dim = dim
         self.domain = domain
+        self.dtype = dtype
+        self.steps = steps
         self.mutation_fn = mutation_fn
         self.device = device
-        self.steps = steps
         self.best = None
         self.best_fit = None
 
@@ -28,7 +30,7 @@ class SimulatedAnnealing:
             self.domain[1] + 1,
             (self.dim,),
             device=self.device,
-            dtype=torch.int32,
+            dtype=self.dtype,
         )
         fit = self.fitness_fn(s)
         self.best = s
@@ -64,11 +66,11 @@ if __name__ == "__main__":
     t0 = timer()
 
     algorithm = SimulatedAnnealing(
-        fitness_fn=one_max,
+        fitness_fn=common.one_max,
         dim=50_000_000,
         domain=(0, 1),
         steps=1_000,
-        mutation_fn=bit_flip_prob(p=0.5),
+        mutation_fn=common.bit_flip_prob(p=0.5),
         device="cuda",
     )
 

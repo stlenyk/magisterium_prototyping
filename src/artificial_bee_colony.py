@@ -1,32 +1,39 @@
-from typing import Callable
-import torch
+import common
 
-from common import bit_flip_n, one_max
+import torch
 
 
 # Note: it minimizes
-class AritficialBeeColony:
+class ArtificialBeeColony:
     def __init__(
         self,
-        fitness_fn: Callable,
+        fitness_fn: common.TensorFn,
         dim: int,
-        n_population: int,
-        domain: tuple[int, int],
+        domain: common.Domain,
+        dtype: torch.dtype = torch.float32,
+        n_population: int = 100,
         max_trials: int = 10,
-        mutation_fn: Callable = bit_flip_n(n=1),
+        mutation_fn: common.TensorFn = None,
         device: torch.device = "cpu",
     ) -> None:
         self.device = device
         self.fitness_fn = fitness_fn
         self.domain = domain
+        self.dtype = dtype
         self.max_trials = max_trials
+        if mutation_fn is None:
+            mutation_fn = common.mutation_n(
+                domain_clip=domain,
+                draw_range=domain,
+                n=1,
+            )
         self.mutation_fn = mutation_fn
         self.population = torch.randint(
             self.domain[0],
             self.domain[1] + 1,
             (n_population, dim),
             device=self.device,
-            dtype=torch.float32,
+            dtype=self.dtype,
         )
         self.trials = torch.zeros(n_population, dtype=torch.int32, device=self.device)
         self.best = self.population[
@@ -91,8 +98,8 @@ class AritficialBeeColony:
             self.domain[0],
             self.domain[1] + 1,
             (selected.sum(), self.population.shape[1]),
-            device=self.device,
-            dtype=torch.float32,
+            dtype=self.dtype,
+            device=self.population.device,
         )
         self.trials[selected] = 0
 
@@ -100,11 +107,12 @@ class AritficialBeeColony:
 
 
 if __name__ == "__main__":
-    abc = AritficialBeeColony(
-        one_max,
+    abc = ArtificialBeeColony(
+        common.one_max,
         dim=500,
         n_population=100_000,
         domain=(0, 1),
+        mutation_fn=common.bit_flip_n(100),
         device="cuda",
     )
 
@@ -113,6 +121,6 @@ if __name__ == "__main__":
     t0 = timer()
     for i in range(100):
         abc.step()
-        print(-one_max(abc.best))
+        print(-common.one_max(abc.best))
     elapsed = timer() - t0
     print(f"Elapsed: {elapsed:.2f}s")

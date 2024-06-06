@@ -27,15 +27,10 @@ def time_fn(fn, *args, out_file=None):
             f.write(f"{elapsed}\n")
 
 
-# indexing = torch.arange(t.shape[1], device=t.device)
-# indexing = indexing.reshape(1, -1)
-# indexing = indexing.repeat(t.shape[0], 1)
-
-
 def one_max_batch(t):
     return torch.sum(t, dim=1) / t.shape[1] * 100
 
-# @torch.compile
+
 def single_point_crossover_batch(t):
     t_swap = t.reshape(t.shape[0] // 2, 2, t.shape[1])
     t_swap = torch.flip(t_swap, [1])
@@ -58,14 +53,12 @@ def single_point_crossover_batch(t):
     return new_t
 
 
-# time_fn(torch.vmap(one_max), t, out_file=f"bench_vmap_one_max.txt")
-# time_fn(one_max_batch, t, out_file=f"bench_vmap_one_max_batch.txt")
+time_fn(torch.vmap(one_max), t, out_file=f"bench_vmap_one_max.txt")
+time_fn(one_max_batch, t, out_file=f"bench_vmap_one_max_batch.txt")
 time_fn(
     torch.vmap(single_point_crossover, randomness="different"),
     t[::2],
     t[1::2],
-    # out_file="bench_vmap_crossover.txt",
+    out_file="bench_vmap_crossover.txt",
 )
 time_fn(single_point_crossover_batch, t, out_file="bench_vmap_crossover_batch.txt")
-
-time_fn(single_point_crossover_batch, t)

@@ -5,5 +5,5 @@
 ITERS=10
 for ((i = 1; i <= $ITERS; i++)); do
     echo "$i"/"$ITERS"
-    time python py/bench_vmap.py
+    time python -m benchmarks.vmap.bench_vmap  
 done

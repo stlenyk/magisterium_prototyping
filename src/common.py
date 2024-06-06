@@ -11,8 +11,8 @@ TensorFn: TypeAlias = Callable[[torch.Tensor], torch.Tensor]
 
 def mutation_n(
     domain_clip: Domain, draw_range: Domain, n: int = 1
-) -> Callable[[torch.Tensor], torch.Tensor]:
-    """Creates a mutation function that adds n random values to n random indices of a tensor.
+) -> TensorFn:
+    """Returns a mutation function that adds n random values to n random indices of a tensor.
 
     Args:
         domain_clip: The domain to clip the random values to.
@@ -35,8 +35,8 @@ def mutation_n(
 
 def mutation_prob(
     domain_clip: Domain, draw_range: Domain, probability: float = 0.1
-) -> Callable[[torch.Tensor], torch.Tensor]:
-    """Creates a mutation function that adds random values to random indices of a tensor with a given probability.
+) -> TensorFn:
+    """Returns a mutation function that adds random values to random indices of a tensor with a given probability.
 
     Args:
         domain_clip: The domain to clip the random values to.
@@ -56,8 +56,8 @@ def mutation_prob(
     return wrapper
 
 
-def bit_flip_n(n: int = 1) -> Callable[[torch.Tensor], torch.Tensor]:
-    """Creates a mutation function that flips n random bits of a tensor.
+def bit_flip_n(n: int = 1) -> TensorFn:
+    """Returns a mutation function that flips n random bits of a tensor.
 
     Args:
         n: The number of bits to flip.
@@ -72,8 +72,8 @@ def bit_flip_n(n: int = 1) -> Callable[[torch.Tensor], torch.Tensor]:
     return wrapper
 
 
-def bit_flip_prob(p: float = 0.1) -> Callable[[torch.Tensor], torch.Tensor]:
-    """Creates a mutation function that flips bits of a tensor with a given probability.
+def bit_flip_prob(p: float = 0.1) -> TensorFn:
+    """Returns a mutation function that flips bits of a tensor with a given probability.
     Args:
         p: The probability [0.0, 1.0] of flipping a bit.
     """

@@ -6,7 +6,6 @@ from src.common import one_max, single_point_crossover
 ITERS = 1000
 DIM = 1000
 BATCH = 100_000
-DIR_NAME = "py/benchmarks"
 
 
 t = torch.randint(0, 2, (BATCH, DIM), dtype=torch.int32, device="cuda")
@@ -24,7 +23,7 @@ def time_fn(fn, *args, out_file=None):
     print(f"{elapsed:.2f} s")
 
     if out_file:
-        with open(f"{DIR_NAME}/{out_file}", "a") as f:
+        with open(f"{out_file}", "a") as f:
             f.write(f"{elapsed}\n")
 
 
@@ -61,12 +60,12 @@ def single_point_crossover_batch(t):
 
 # time_fn(torch.vmap(one_max), t, out_file=f"bench_vmap_one_max.txt")
 # time_fn(one_max_batch, t, out_file=f"bench_vmap_one_max_batch.txt")
-# time_fn(
-#     torch.vmap(single_point_crossover, randomness="different"),
-#     t[::2],
-#     t[1::2],
-#     out_file="bench_vmap_crossover.txt",
-# )
-# time_fn(single_point_crossover_batch, t, out_file="bench_vmap_crossover_batch.txt")
+time_fn(
+    torch.vmap(single_point_crossover, randomness="different"),
+    t[::2],
+    t[1::2],
+    # out_file="bench_vmap_crossover.txt",
+)
+time_fn(single_point_crossover_batch, t, out_file="bench_vmap_crossover_batch.txt")
 
 time_fn(single_point_crossover_batch, t)

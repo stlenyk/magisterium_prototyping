@@ -5,7 +5,7 @@ def mutation_n(domain_clip, draw_range, n=1):
     def wrapper(x):
         indices = torch.randint(0, x.shape[0], (n,), device=x.device)
         values = torch.randint(draw_range[0], draw_range[1] + 1, (n,), device=x.device, dtype=x.dtype)
-        valeus = torch.clip(values, domain_clip[0], domain_clip[1])
+        values = torch.clip(values, domain_clip[0], domain_clip[1])
         x[indices] += values
         return x
 

@@ -13,6 +13,7 @@ class SimulatedAnnealing:
         steps: int = 1000,
         mutation_fn: common.TensorFn = None,
         device: torch.device = "cpu",
+        logging: bool = False,
     ) -> None:
         self.fitness_fn = fitness_fn
         self.dim = dim
@@ -21,6 +22,7 @@ class SimulatedAnnealing:
         self.steps = steps
         self.mutation_fn = mutation_fn
         self.device = device
+        self.logging = logging
         self.best = None
         self.best_fit = None
 
@@ -38,7 +40,7 @@ class SimulatedAnnealing:
 
         for k in range(self.steps):
             # log every 1% of the steps
-            if k % (self.steps // 100) == 0:
+            if self.logging and k % (self.steps // 100) == 0:
                 print(f"{k / self.steps * 100:.0f}%", -self.fitness_fn(self.best))
             new_s = self.mutation_fn(s)
             new_fit = self.fitness_fn(new_s)
@@ -72,6 +74,7 @@ if __name__ == "__main__":
         steps=1_000,
         mutation_fn=common.bit_flip_prob(p=0.5),
         device="cuda",
+        logging=True,
     )
 
     algorithm.run()

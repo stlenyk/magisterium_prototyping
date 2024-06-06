@@ -9,9 +9,7 @@ Domain: TypeAlias = tuple[int, int] | tuple[float, float] | tuple[bool, bool]
 TensorFn: TypeAlias = Callable[[torch.Tensor], torch.Tensor]
 
 
-def mutation_n(
-    domain_clip: Domain, draw_range: Domain, n: int = 1
-) -> TensorFn:
+def mutation_n(domain_clip: Domain, draw_range: Domain, n: int = 1) -> TensorFn:
     """Returns a mutation function that adds n random values to n random indices of a tensor.
 
     Args:
@@ -99,6 +97,6 @@ def single_point_crossover(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
 
 
 def one_max(x: torch.Tensor) -> torch.Tensor:
-    """Fitness function. Returns the percentage of ones in a tensor."""
+    """Fitness function. Returns the percentage of ones in a boolean tensor."""
     n = x.shape[0]
     return -torch.sum(x) / n * 100

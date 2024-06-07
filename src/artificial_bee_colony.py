@@ -79,7 +79,7 @@ class ArtificialBeeColony:
         new_fitness = torch.vmap(self.fitness_fn)(new_population)
         # sort descending, so that when indexing later, smallest (best) fitnesses and consequently solutions are chosen last,
         # i.e. they will be the ones that are inserted into the tensor
-        new_fitness, indices = torch.sort(new_fitness)
+        new_fitness, indices = torch.sort(new_fitness, descending=True)
         new_population = new_population[indices]
         new_population_ind = new_population_ind[indices]
 

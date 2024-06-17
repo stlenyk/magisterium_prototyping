@@ -1,4 +1,4 @@
-import func
+from optimization_algorithms import func
 
 import torch
 
@@ -60,24 +60,3 @@ class SimulatedAnnealing:
 
     def best(self):
         return self._best, self._best_fit
-
-
-if __name__ == "__main__":
-    from timeit import default_timer as timer
-
-    t0 = timer()
-
-    algorithm = SimulatedAnnealing(
-        fitness_fn=func.one_max,
-        dim=50_000_000,
-        domain=(0, 1),
-        steps=1_000,
-        mutation_fn=func.bit_flip_prob(p=0.5),
-        device="cuda",
-        logging=True,
-    )
-
-    algorithm.run()
-    print(algorithm.best())
-    elapsed_time = timer() - t0
-    print(f"Elapsed time: {elapsed_time:.2f}s")

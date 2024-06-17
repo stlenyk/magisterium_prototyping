@@ -1,7 +1,7 @@
 import torch
 from timeit import default_timer as timer
 
-from src.func import one_max, single_point_crossover
+from optimization_algorithms import func
 
 ITERS = 1000
 DIM = 1000
@@ -53,10 +53,10 @@ def single_point_crossover_batch(t):
     return new_t
 
 
-time_fn(torch.vmap(one_max), t, out_file=f"bench_vmap_one_max.txt")
+time_fn(torch.vmap(func.one_max), t, out_file=f"bench_vmap_one_max.txt")
 time_fn(one_max_batch, t, out_file=f"bench_vmap_one_max_batch.txt")
 time_fn(
-    torch.vmap(single_point_crossover, randomness="different"),
+    torch.vmap(func.single_point_crossover, randomness="different"),
     t[::2],
     t[1::2],
     out_file="bench_vmap_crossover.txt",

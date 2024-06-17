@@ -1,4 +1,4 @@
-import func
+from optimization_algorithms import func
 
 import torch
 

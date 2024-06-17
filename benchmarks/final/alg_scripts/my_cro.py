@@ -1,7 +1,6 @@
 import sys
-import src.func as func
-from src.coral_reef import CoralReefOptimization
-
+from optimization_algorithms import func
+from optimization_algorithms import CoralReefOptimization
 
 device = sys.argv[1]
 dim = int(sys.argv[2])

@@ -9,6 +9,34 @@ Domain: TypeAlias = tuple[int, int] | tuple[float, float] | tuple[bool, bool]
 TensorFn: TypeAlias = Callable[[torch.Tensor], torch.Tensor]
 
 
+def rand_range_infer(
+    input: torch.Tensor, size: tuple[int], range: Domain
+) -> torch.Tensor:
+    """Returns a tensor filled with random values. Infers the dtype and device from input.
+
+    Args:
+        input: The input tensor to infer the dtype and device from.
+        size: The size of the output tensor.
+        domain: The domain to draw the random values from.
+
+    Raises:
+        ValueError: If the `input` tensor is complex.
+    """
+    if torch.is_complex(input):
+        raise ValueError("No support for complex tensors.")
+
+    if torch.is_floating_point(input):
+        return (
+            torch.rand(size, dtype=input.dtype, device=input.device)
+            * (range[1] - range[0])
+            + range[0]
+        )
+    else:
+        return torch.randint(
+            range[0], range[1] + 1, size, device=input.device, dtype=input.dtype
+        )
+
+
 def mutation_n(domain_clip: Domain, draw_range: Domain, n: int = 1) -> TensorFn:
     """Returns a mutation function that adds n random values to n random indices of a tensor.
 

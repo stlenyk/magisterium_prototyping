@@ -1,36 +1,42 @@
-import common
+import func
 
 import torch
 
 
-class CoralReef:
+class CoralReefOptimization:
     def __init__(
         self,
-        fitness_fn: common.TensorFn,
+        fitness_fn: func.TensorFn,
         dim: int,
-        domain: common.Domain,
+        domain: func.Domain,
         dtype: torch.dtype = None,
+        n_steps: int = 100,
         n_population: int = 100,
         settling_trials: int = 10,
         frac_init_alive: float = 0.2,
         frac_broadcast: float = 0.5,
         frac_duplication: float = 0.1,
         prob_die: float = 0.5,
-        mutation_fn: common.TensorFn = None,
+        mutation_fn: func.TensorFn = None,
+        crossover_fn: func.TensorFn = None,
         device: torch.device = "cpu",
     ):
         self.device = device
         self.fitness_fn = fitness_fn
         self.dtype = dtype
         self.domain = domain
+        self.n_steps = n_steps
         self.settling_trials = settling_trials
         self.frac_duplication = frac_duplication
         self.prob_die = prob_die
         if mutation_fn is None:
-            mutation_fn = common.mutation_prob(
+            mutation_fn = func.mutation_prob(
                 domain_clip=domain, draw_range=domain, probability=0.1
             )
         self.mutation_fn = mutation_fn
+        if crossover_fn is None:
+            crossover_fn = func.uniform_crossover
+        self.crossover_fn = crossover_fn
         self.fract_broadcast = frac_broadcast
         self.fract_duplication = frac_duplication
         self.prob_die = prob_die
@@ -67,7 +73,7 @@ class CoralReef:
         self, alive: torch.Tensor, n_broadcasters: int
     ) -> torch.Tensor:
         broadcasters = self.grid_values[alive[:n_broadcasters]]
-        new_corals = torch.vmap(common.uniform_crossover, randomness="different")(
+        new_corals = torch.vmap(self.crossover_fn, randomness="different")(
             broadcasters[::2], broadcasters[1::2]
         )
 
@@ -134,26 +140,35 @@ class CoralReef:
         self._depredation()
 
     def best(self):
-        best_coral = self.grid_values[torch.argmin(self.grid_fitness)]
-        return best_coral, self.fitness_fn(best_coral)
+        best_coral_idx = torch.argmin(self.grid_fitness)
+        best_coral = self.grid_values[best_coral_idx]
+        best_fit = self.grid_fitness[best_coral_idx]
+        return best_coral, best_fit
+
+    def run(self):
+        for _ in range(self.n_steps):
+            self.step()
 
 
-if __name__ == "__main__":
-
-    reef = CoralReef(
+def main():
+    reef = CoralReefOptimization(
         device="cuda",
-        fitness_fn=common.one_max,
+        fitness_fn=func.one_max,
         n_population=100_000,
         domain=(0, 1),
         dim=500,
         settling_trials=3,
-        mutation_fn=common.bit_flip_prob(),
+        mutation_fn=func.bit_flip_prob(),
         frac_broadcast=0.7,
         frac_duplication=0.1,
         prob_die=0.1,
     )
 
-    for _ in range(100):
+    steps = 100
+    for k in range(steps):
         reef.step()
-        alive = torch.where(reef.grid_alive)[0].shape[0]
-        print(f"{-reef.best()[1].cpu().numpy():.2f}", alive)
+        print(f"{k+1}/{steps} {-reef.best()[1]:.2f}")
+
+
+if __name__ == "__main__":
+    main()

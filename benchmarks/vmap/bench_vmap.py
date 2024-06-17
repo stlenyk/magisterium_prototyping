@@ -1,7 +1,7 @@
 import torch
 from timeit import default_timer as timer
 
-from src.common import one_max, single_point_crossover
+from src.func import one_max, single_point_crossover
 
 ITERS = 1000
 DIM = 1000

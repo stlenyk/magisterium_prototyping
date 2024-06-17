@@ -1,4 +1,4 @@
-import common
+import func
 
 import torch
 
@@ -7,22 +7,24 @@ import torch
 class ArtificialBeeColony:
     def __init__(
         self,
-        fitness_fn: common.TensorFn,
+        fitness_fn: func.TensorFn,
         dim: int,
-        domain: common.Domain,
-        dtype: torch.dtype = torch.float32,
+        domain: func.Domain,
+        n_steps: int = 100,
+        dtype: torch.dtype = torch.int32,
         n_population: int = 100,
         max_trials: int = 10,
-        mutation_fn: common.TensorFn = None,
+        mutation_fn: func.TensorFn = None,
         device: torch.device = "cpu",
     ) -> None:
         self.device = device
         self.fitness_fn = fitness_fn
         self.domain = domain
+        self.n_steps = n_steps
         self.dtype = dtype
         self.max_trials = max_trials
         if mutation_fn is None:
-            mutation_fn = common.mutation_n(
+            mutation_fn = func.mutation_n(
                 domain_clip=domain,
                 draw_range=domain,
                 n=1,
@@ -36,7 +38,7 @@ class ArtificialBeeColony:
             dtype=self.dtype,
         )
         self.trials = torch.zeros(n_population, dtype=torch.int32, device=self.device)
-        self.best = self.population[
+        self._best = self.population[
             torch.argmin(torch.vmap(self.fitness_fn)(self.population))
         ]
 
@@ -54,10 +56,10 @@ class ArtificialBeeColony:
 
     def _update_best(self, new_fitness):
         best_candidate = torch.argmin(new_fitness)
-        self.best = torch.where(
-            new_fitness[best_candidate] < self.fitness_fn(self.best),
+        self._best = torch.where(
+            new_fitness[best_candidate] < self.fitness_fn(self._best),
             self.population[best_candidate],
-            self.best,
+            self._best,
         )
 
     # Notice how steps 1. (employed bees) and 2. (onlooker bees) could be combined
@@ -105,22 +107,36 @@ class ArtificialBeeColony:
 
         self._update_best(torch.vmap(self.fitness_fn)(self.population))
 
+    def run(self):
+        for _ in range(self.n_steps):
+            self.step()
 
-if __name__ == "__main__":
+    def best(self):
+        return self._best, self.fitness_fn(self._best)
+
+
+def main():
+    from timeit import default_timer as timer
+
     abc = ArtificialBeeColony(
-        common.one_max,
+        func.one_max,
         dim=500,
         n_population=100_000,
         domain=(0, 1),
-        mutation_fn=common.bit_flip_n(100),
+        mutation_fn=func.bit_flip_n(100),
         device="cuda",
     )
-
-    from timeit import default_timer as timer
-
-    t0 = timer()
+    abc.step()
+    torch.cuda.synchronize()
+    start = timer()
     for i in range(100):
         abc.step()
-        print(-common.one_max(abc.best))
-    elapsed = timer() - t0
-    print(f"Elapsed: {elapsed:.2f}s")
+        print(-abc.best()[1])
+    torch.cuda.synchronize()
+    elapsed = timer() - start
+    print(f"Elapsed: {elapsed:.2f}")
+
+
+if __name__ == "__main__":
+    torch._dynamo.config.capture_func_transforms = True
+    main()

@@ -6,14 +6,14 @@ from jmetal.util.termination_criterion import StoppingByEvaluations
 from jmetal.operator import BitFlipMutation
 
 
-dim = sys.argv[1]
+dim = int(sys.argv[1])
 
-algorithm = SimulatedAnnealing(
+alg = SimulatedAnnealing(
     problem=OneMax(number_of_bits=dim),
     mutation=BitFlipMutation(probability=0.5),
     termination_criterion=StoppingByEvaluations(1_000),
 )
 
-algorithm.run()
-res = sum(algorithm.get_result().variables[0]) / dim * 100
-print(f"{res:.2f}")
+alg.run()
+res = sum(alg.get_result().variables[0]) / dim * 100
+print(res)

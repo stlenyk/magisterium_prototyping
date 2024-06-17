@@ -8,8 +8,8 @@ from cro import CRO
 import numba
 
 Ngen = 1000  # Number of generations
-N = sys.argv[2]  # MxN: reef size
-L = sys.argv[1]  # dim
+L = int(sys.argv[1])  # dim
+N = int(sys.argv[2])  # MxN: reef size
 
 M = 1  # MxN: reef size
 Fb = 0.7  # Broadcast prob.

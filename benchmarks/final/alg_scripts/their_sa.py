@@ -11,7 +11,8 @@ dim = int(sys.argv[1])
 alg = SimulatedAnnealing(
     problem=OneMax(number_of_bits=dim),
     mutation=BitFlipMutation(probability=0.5),
-    termination_criterion=StoppingByEvaluations(1_000),
+    # n_steps == n_evaluations (checked in their source code)
+    termination_criterion=StoppingByEvaluations(1000),
 )
 
 alg.run()

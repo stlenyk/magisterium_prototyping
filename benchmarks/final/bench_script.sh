@@ -41,7 +41,7 @@ hyperfine "python $ALG_DIR/my_abc.py cpu 500 {n_population}" \
     --export-csv $RES_DIR/"my_abc_cpu.csv" \
     --parameter-list n_population $N_SMALL
 
-hyperfine "python $ALG_DIR/my_sa.py cuda 500 {n_population}" \
+hyperfine "python $ALG_DIR/my_sa.py cuda {n_dim}" \
     --warmup $HYP_N_WARMUP \
     --runs $HYP_N_RUNS \
     --export-csv $RES_DIR/"my_sa_cuda.csv" \

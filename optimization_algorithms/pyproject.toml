@@ -1,0 +1,9 @@
+[project]
+name = "optimization_algorithms"
+version = "0.0.1"
+dependencies = ["torch"]
+
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"

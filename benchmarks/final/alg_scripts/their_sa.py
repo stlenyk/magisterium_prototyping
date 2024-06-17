@@ -1,10 +1,12 @@
+import sys
+
 from jmetal.algorithm.singleobjective import SimulatedAnnealing
 from jmetal.problem import OneMax
 from jmetal.util.termination_criterion import StoppingByEvaluations
 from jmetal.operator import BitFlipMutation
-from jmetal.problem import TSP
 
-dim = 50_000
+
+dim = sys.argv[1]
 
 algorithm = SimulatedAnnealing(
     problem=OneMax(number_of_bits=dim),

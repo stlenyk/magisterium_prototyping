@@ -10,19 +10,17 @@ class SimulatedAnnealing:
         dim: int,
         domain: func.Domain,
         dtype: torch.dtype = None,
-        steps: int = 1000,
+        n_steps: int = 1000,
         mutation_fn: func.TensorFn = None,
         device: torch.device = "cpu",
-        logging: bool = False,
     ) -> None:
         self.fitness_fn = fitness_fn
         self.dim = dim
         self.domain = domain
         self.dtype = dtype
-        self.n_steps = steps
+        self.n_steps = n_steps
         self.mutation_fn = mutation_fn
         self.device = device
-        self.logging = logging
         self._best = None
         self._best_fit = None
 

@@ -12,7 +12,9 @@ import numpy as np
 abc_conf = Config.Config([])  # empy argv
 
 abc_conf.DIMENSION = int(sys.argv[1])
-n_steps = int(sys.argv[2])
+abc_conf.FOOD_NUMBER = int(sys.argv[2])
+
+n_steps = 1000
 
 # tweak, so that it doesnt't stop before n_steps
 abc_conf.MAXIMUM_EVALUATION = 1_000_000_000_000

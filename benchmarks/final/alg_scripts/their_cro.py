@@ -1,6 +1,9 @@
 # https://github.com/VictorPelaez/coral-reef-optimization-algorithm
-# remember to remove `extreme_depredation` from the `CRO` class
-# and fix `multiprocess` to `multiprocessing`
+# remember to:
+# * remove multiprocessing and change fit() calucation to list comprehension
+# * remove `extreme_depredation()` call
+
+
 import sys
 
 import numpy as np

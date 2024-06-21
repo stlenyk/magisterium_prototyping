@@ -43,7 +43,27 @@ class ArtificialBeeColony:
             selected.reshape(-1, 1), new_population, self.population
         )
 
-    def _gen_new_population(self, new_population: torch.Tensor) -> torch.Tensor:
+    def _gen_new_individual(self, individual: torch.Tensor) -> torch.Tensor:
+        neighbour = self.population[
+            torch.randint(0, self.population.shape[0], (1,), device=self.device)
+        ][0]
+        change_idx = torch.randint(0, individual.shape[0], (1,), device=self.device)
+        r = torch.rand(1, device=self.device) * 2.0 - 1.0
+        new_value = r * (individual[change_idx] - neighbour[change_idx])
+        new_value = torch.round(new_value)
+        new_value = new_value.to(self.dtype)
+        new_value = torch.clamp(new_value, self.domain[0], self.domain[1])
+
+        new_individual = individual.clone()
+        new_individual[change_idx] = new_value
+        return new_individual
+
+    def _gen_new_population(self, population: torch.Tensor) -> torch.Tensor:
+        return torch.vmap(self._gen_new_individual, randomness="different")(population)
+
+    def _gen_new_population_mutate_all_idx(
+        self, population: torch.Tensor
+    ) -> torch.Tensor:
         neighbours = self.population[
             torch.randint(
                 0,
@@ -52,13 +72,11 @@ class ArtificialBeeColony:
                 device=self.device,
             )
         ]
-        new_population = new_population + (
-            (torch.rand(new_population.shape, device=new_population.device) * 2.0 - 1.0)
-            * (new_population - neighbours)
-        )
+        r = torch.rand(neighbours.shape, device=self.device) * 2.0 - 1.0
+        new_population = population + (r * (population - neighbours))
         new_population = torch.round(new_population)
-        new_population = torch.clamp(new_population, self.domain[0], self.domain[1])
         new_population = new_population.to(self.dtype)
+        new_population = torch.clamp(new_population, self.domain[0], self.domain[1])
         return new_population
 
     def _update_best(self, new_fitness):

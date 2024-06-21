@@ -13,7 +13,6 @@ alg = ArtificialBeeColony(
     fitness_fn=func.one_max,
     domain=(0, 1),
     max_trials=10,
-    mutation_fn=func.bit_flip_n(100),
 )
 alg.run()
 result = alg.best()

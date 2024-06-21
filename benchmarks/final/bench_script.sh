@@ -63,7 +63,7 @@ hyperfine "python $ALG_DIR/their_abc.py 500 {n_population}" \
     --warmup $HYP_N_WARMUP \
     --runs $HYP_N_RUNS \
     --export-csv $RES_DIR/"their_abc.csv" \
-    --parameter-list n_population "10,20,50,100,200,400"
+    --parameter-list n_population $N_SMALL
 
 hyperfine "python $ALG_DIR/their_sa.py {n_dim}" \
     --warmup $HYP_N_WARMUP \

@@ -109,7 +109,7 @@ class CoralReefOptimization:
             self.fract_duplication * torch.where(self.grid_alive)[0].shape[0]
         )
         best_corals = self.grid_values[
-            torch.topk(self.grid_fitness, n_duplication).indices
+            torch.topk(self.grid_fitness, n_duplication, largest=False).indices
         ]
         self._larvae_settling(best_corals)
 
@@ -117,7 +117,7 @@ class CoralReefOptimization:
         n_depredation = int(
             self.frac_duplication * torch.where(self.grid_alive)[0].shape[0]
         )
-        coral_indices = torch.topk(-self.grid_fitness, n_depredation).indices
+        coral_indices = torch.topk(self.grid_fitness, n_depredation).indices
         coral_indices = coral_indices[
             torch.rand(coral_indices.shape[0], device=self.device) < self.prob_die
         ]
@@ -148,27 +148,3 @@ class CoralReefOptimization:
     def run(self):
         for _ in range(self.n_steps):
             self.step()
-
-
-def main():
-    reef = CoralReefOptimization(
-        device="cuda",
-        fitness_fn=func.one_max,
-        n_population=100_000,
-        domain=(0, 1),
-        dim=500,
-        settling_trials=3,
-        mutation_fn=func.bit_flip_prob(),
-        frac_broadcast=0.7,
-        frac_duplication=0.1,
-        prob_die=0.1,
-    )
-
-    steps = 100
-    for k in range(steps):
-        reef.step()
-        print(f"{k+1}/{steps} {-reef.best()[1]:.2f}")
-
-
-if __name__ == "__main__":
-    main()

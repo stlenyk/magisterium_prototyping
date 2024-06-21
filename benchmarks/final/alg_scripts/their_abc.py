@@ -18,6 +18,7 @@ abc_conf.FOOD_NUMBER = int(sys.argv[2])
 abc_conf.LOWER_BOUND = 0
 abc_conf.UPPER_BOUND = 1
 abc_conf.OBJECTIVE_FUNCTION = one_max
+abc_conf.LIMIT = 10
 
 # tweak, so that it doesnt't stop before n_steps
 abc_conf.MAXIMUM_EVALUATION = 1_000_000_000_000

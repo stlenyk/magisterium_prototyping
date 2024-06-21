@@ -49,7 +49,7 @@ class ArtificialBeeColony:
         old_fitness = torch.vmap(self.fitness_fn)(self.population)
         new_fitness = torch.vmap(self.fitness_fn)(new_population)
         selected = new_fitness < old_fitness
-        self.trials = torch.where(selected, 0, self.trials + 1)
+        self.trials[selected] = -1
         self.population = torch.where(
             selected.reshape(-1, 1), new_population, self.population
         )
@@ -91,7 +91,7 @@ class ArtificialBeeColony:
             selected.reshape(-1, 1), new_population, self.population[new_population_ind]
         )
         self.trials[new_population_ind] = torch.where(
-            selected, 0, self.trials[new_population_ind] + 1
+            selected, -1, self.trials[new_population_ind]
         )
 
         # 3. Scout bees
@@ -103,7 +103,8 @@ class ArtificialBeeColony:
             dtype=self.dtype,
             device=self.population.device,
         )
-        self.trials[selected] = 0
+        self.trials[selected] = -1
+        self.trials += 1
 
         self._update_best(torch.vmap(self.fitness_fn)(self.population))
 

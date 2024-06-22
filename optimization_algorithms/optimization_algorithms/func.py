@@ -48,7 +48,7 @@ def mutation_n(domain_clip: Domain, draw_range: Domain, n: int = 1) -> TensorFn:
 
     @functools.wraps(mutation_n)
     def wrapper(x: torch.Tensor) -> torch.Tensor:
-        indices = torch.randint(x.shape[0] + 1, (n,), device=x.device)
+        indices = torch.randint(x.shape[0], (n,), device=x.device)
         values = torch.randint(
             draw_range[0], draw_range[1] + 1, (n,), device=x.device, dtype=x.dtype
         )

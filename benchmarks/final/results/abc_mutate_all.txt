@@ -1,0 +1,13 @@
+config: 10^4x10^4
+
+Time [s]:
+cuda_mutate_one: 61.96
+cuda_mutate_all: 105.41
+cpu_mutate_one_2000: 25.78
+cpu_mutate_all_2000: 74.49
+
+Fitness:
+cuda_mutate_one: 52.16
+cuda_mutate_all: 100.0
+cpu_mutate_one_2000: 55.25
+cpu_mutate_all_2000: 100.0

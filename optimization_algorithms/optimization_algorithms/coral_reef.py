@@ -66,7 +66,7 @@ class CoralReefOptimization:
         self.grid_fitness = torch.where(
             self.grid_alive,
             torch.func.vmap(fitness_fn)(self.grid_values),
-            torch.zeros(n_population, dtype=torch.float32, device=self.device),
+            torch.inf,
         )
 
     def _broadcast_spawning(

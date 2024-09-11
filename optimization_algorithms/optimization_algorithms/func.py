@@ -131,3 +131,73 @@ def one_max(x: torch.Tensor) -> torch.Tensor:
     """Fitness function. Returns the percentage of ones in a boolean tensor."""
     n = x.shape[0]
     return -torch.sum(x) / n * 100
+
+
+def _bit3_deceptive_single_group(x: torch.Tensor) -> torch.Tensor:
+    """Calculates the 3-bit deceptive problem for a single 3-bit group.
+
+    3-bit group | Value
+    -------------------
+    111         | 80
+    000         | 70
+    001         | 50
+    010         | 49
+    100         | 30
+    110         | 3
+    101         | 2
+    011         | 1
+    """
+
+    device = x.device
+    return (
+        torch.tensor([1, 1, 1], device=device).eq(x).all() * 80
+        + torch.tensor([0, 0, 0], device=device).eq(x).all() * 70
+        + torch.tensor([0, 0, 1], device=device).eq(x).all() * 50
+        + torch.tensor([0, 1, 0], device=device).eq(x).all() * 49
+        + torch.tensor([1, 0, 0], device=device).eq(x).all() * 30
+        + torch.tensor([1, 1, 0], device=device).eq(x).all() * 3
+        + torch.tensor([1, 0, 1], device=device).eq(x).all() * 2
+        + torch.tensor([0, 1, 1], device=device).eq(x).all() * 1
+    )
+
+
+def bit3_deceptive(x: torch.Tensor) -> torch.Tensor:
+    """Fitness function. Calculates the 3-bit deceptive problem.
+
+    3-bit group | Value
+    -------------------
+    111         | 80
+    000         | 70
+    001         | 50
+    010         | 49
+    100         | 30
+    110         | 3
+    101         | 2
+    011         | 1
+    """
+
+    return torch.vmap(_bit3_deceptive_single_group)(x.reshape(-1, 3)).sum()
+
+
+def travelling_salesman(
+    d: torch.Tensor,
+) -> TensorFn:
+    """Fitness function. Calculates the total distance of a path in the Travelling Salesman Problem.
+
+    d - distance matrix, where d[i, j] is the distance between cities i and j.
+    Produces a function that takes path, i.e. a permutation of [0, 1, ..., n-1], and returns the total distance.
+    """
+    inf = d.max() * d.shape[0]
+
+    @functools.wraps(travelling_salesman)
+    def wrapper(x: torch.Tensor) -> torch.Tensor:
+        wrong_condition = (
+            ~torch.eq(
+                torch.sort(x).values, torch.arange(x.shape[0], device=x.device)
+            ).all()
+            * inf
+        )
+        tsp = torch.sum(d[x, torch.roll(x, 1, dims=0)])
+        return (wrong_condition + tsp).to(torch.float32)
+
+    return wrapper

@@ -176,7 +176,11 @@ def bit3_deceptive(x: torch.Tensor) -> torch.Tensor:
     011         | 1
     """
 
-    return torch.vmap(_bit3_deceptive_single_group)(x.reshape(-1, 3)).sum()
+    return (
+        -torch.vmap(_bit3_deceptive_single_group)(x.reshape(-1, 3))
+        .sum()
+        .to(torch.float32)
+    )
 
 
 def travelling_salesman(

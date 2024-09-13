@@ -13,11 +13,10 @@ pip install "git+https://github.com/stlenyk/magisterium_prototyping/#egg=optimiz
 ```py
 from optimization_algorithms import CoralReefOptimization, func
 
-
 alg = CoralReefOptimization(
-    device="cuda",  # or "cpu"
-    dim=10,
-    n_population=n_population,
+    device="cpu",  # or "cpu"
+    dim=500,
+    n_population=1000,
     n_steps=1000,
     fitness_fn=func.one_max,
     domain=(0, 1),

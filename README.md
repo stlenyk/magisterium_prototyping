@@ -10,11 +10,21 @@ pip install "git+https://github.com/stlenyk/magisterium_prototyping/#egg=optimiz
 
 ## Usage
 
+This small library includes algorihm modules:
+
+- [`CoralReefOptimization`](optimization_algorithms/optimization_algorithms/coral_reef.py) ([paper](https://doi.org/10.1155/2014/739768))
+- [`ArtificialBeeColony`](optimization_algorithms/optimization_algorithms/artificial_bee_colony.py)
+- [`SimulatedAnnealing`](optimization_algorithms/optimization_algorithms/simulated_annealing.py)
+
+and a [`func`](optimization_algorithms/optimization_algorithms/func.py) module with some predefined fitness (cost) functions, mutation and crossover functions.
+
+Example:
+
 ```py
 from optimization_algorithms import CoralReefOptimization, func
 
 alg = CoralReefOptimization(
-    device="cpu",  # or "cpu"
+    device="cuda",  # or "cpu"
     dim=500,
     n_population=1000,
     n_steps=1000,
